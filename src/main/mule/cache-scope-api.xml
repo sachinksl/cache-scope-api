@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<ee:object-store-caching-strategy name="Caching_Strategy" doc:name="Caching Strategy" doc:id="3db6bf02-4459-4204-ac9d-f3e67fb4c963" objectStore="Object_store" keyGenerationExpression="accessTokenKey"/>
+	<os:object-store name="Object_store" doc:name="Object store" doc:id="ddb3c479-fa38-4be3-837a-d80c94a44045" entryTtl="15" expirationInterval="10" entryTtlUnit="MINUTES" config-ref="ObjectStore_Config"/>
+	<os:config name="ObjectStore_Config" doc:name="ObjectStore Config" doc:id="9f58f9dd-fe19-4793-9053-5d2da227747f" />
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="970c98b5-7088-44b9-9680-72f820b6da11" >
+		<http:request-connection protocol="HTTPS" host="login.salesforce.com" />
+	</http:request-config>
+	<flow name="cache-scope-apiFlow" doc:id="1c34cf4c-f2ec-4dfc-a17d-24016da3d41d" >
+		<scheduler doc:name="Scheduler" doc:id="fcbdf495-8541-4dc1-91d8-805bdfee615f" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="10000"/>
+			</scheduling-strategy>
+		</scheduler>
+		<ee:transform doc:name="createTokenRequest" doc:id="9d07a422-c96a-4e60-b54b-3f6cf8fb7129" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="requestSessionID" ><![CDATA[%dw 2.0
+output application/x-www-form-urlencoded
+---
+
+{
+"grant_type" :  "password" ,
+"client_id" : "3MVG9GCMQoQ6rpzRXdxPJDpouZnNLdUiVuEW5ZRhRMCFR5UPPO8dvzix.jeAjpqNRgpr_5_LbeJS0SV3J7GMt" ,
+"client_secret" : "2DC3B1998557268B83DDE0E70513F06EC34FAAEBF1D220DE329DAA5D2718A0FE",
+"username" : "sachinksl10@gmail.com" ,
+"password" : "Summ3r\$100XFVC5nRpKq4w2HcbS06d7vT8"
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:cache doc:name="Cache Token" doc:id="e94ff65c-f5e6-42da-8aa3-4029c38e22fc" cachingStrategy-ref="Caching_Strategy">
+			<http:request method="POST" doc:name="Salesforce HTTPS Request" doc:id="28ed327c-5680-46d4-b077-5a1e7c43d978" path="/services/oauth2/token" config-ref="HTTP_Request_configuration" sendBodyMode="ALWAYS">
+				<http:body ><![CDATA[#[vars.requestSessionID]]]></http:body>
+			</http:request>
+		</ee:cache>
+		<ee:transform doc:name="Add Bearer Token" doc:id="0e626504-ef33-4938-b94e-52c472af4627" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+
+"Bearer " ++ payload.access_token]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="391c676b-ff79-4bd6-bf02-1e7a0c3d8e71" message="#[payload]"/>
+	</flow>
+</mule>
